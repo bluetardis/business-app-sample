@@ -40,6 +40,7 @@ local scene = composer.newScene()
 
 local socket = require( "socket" )
 local widget = require( "widget" )
+local utf8 = require( "plugin.utf8" )
 
 -- if you have an Atom feed uncomment this and comment out the line after it.
 -- local rss = require("atom")
@@ -114,7 +115,7 @@ local function onRowRender(event)
     local story = event.row.params.story
     local id = row.index
     --
-    -- boundry check to make sure we are tnot trying to access a story that
+    -- boundry check to make sure we are not trying to access a story that
     -- doesnt exist.
     --
     if id > #stories then return true end
@@ -123,7 +124,6 @@ local function onRowRender(event)
     row.bg.anchorX = 0
     row.bg.anchorY = 0
     row.bg:setFillColor( 1, 1, 1 )
-
     row:insert(row.bg)
     
     --
@@ -217,15 +217,13 @@ local function onRowRender(event)
     -- Figure out how long I can make my titles
     --
     local titleLength = math.floor(display.contentWidth / 11) - 3
-    print("titleLength ", titleLength)
-    print("CL", display.contentWidth)
     --
     -- Now create the first line of text in the table view with the headline
     -- of the story item.
     --
     local myTitle = story.title
-    if string.len(myTitle) > titleLength then
-        myTitle = string.sub(story.title, 1, titleLength) .. "..."
+    if utf8.len(myTitle) > titleLength then
+        myTitle = utf8.sub(myTitle, 1, titleLength) .. "..."
     end
     row.title = display.newText( myTitle, 12, 0, myApp.fontBold, 18 )
     row.title.anchorX = 0
@@ -411,13 +409,23 @@ end
 local function tableViewListener(event)
     print("tableViewListener", event.phase, event.direction, event.limitReached, myList:getContentPosition( ))
     if event.phase == "began" then
-        springStart = event.target.parent.parent:getContentPosition( )
+        local currentPosition = nil
+        if event.target.parent.parent.getContentPosition then 
+            currentPosition = event.target.parent.parent:getContentPosition( )
+        end
+        springStart = currentPosition
         print("springStart", springStart)
         needToReload = false
-        spinner.isVisible = true
-        spinner:start()
+        if not spinner.isVisible then
+            spinner.isVisible = true
+            spinner:start()
+        end
     elseif event.phase == "moved" then
-        if event.target.parent.parent:getContentPosition( ) > springStart + 60 then
+        local currentPosition = nil
+        if event.target.parent.parent.getContentPosition then
+            currentPosition = event.target.parent.parent:getContentPosition( )
+        end
+        if currentPosition and springStart and currentPosition > springStart + 60 then
             needToReload = true
             --print("needToReload", needToReload, myList:getContentPosition( ), springStart + 60)
         end
@@ -457,7 +465,7 @@ function scene:create( event )
         title = "Corona Labs",
         backgroundColor = { 0.96, 0.62, 0.34 },
         titleColor = {1, 1, 1},
-        font = "HelveticaNeue"
+        font = myApp.fontBold
     })
     sceneGroup:insert(navBar)
 

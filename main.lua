@@ -51,25 +51,30 @@ if display.contentWidth > 320 then
     myApp.is_iPad = true
 end
 
---
--- turn on debugging
---
-local debugMode = true
-
---
--- this little snippet will make a copy of the print function
--- and now will only print if debugMode is true
--- quick way to clean up your logging for production
---
-
-reallyPrint = print
-function print(...)
-    if debugMode then
-        reallyPrint(unpack(arg))
-    end
-end
-
 math.randomseed(os.time())
+
+--
+-- Initialize database
+-- 
+local db = require( "database" )
+local myScheme = {}
+myScheme["__tableName"] = "accounts"
+myScheme["firstName"] = "text"
+myScheme["lastName"] = "text"
+myScheme["email"] = "text"
+
+
+--
+-- Create the database
+-- store the object handle in our faux global myApp table
+--
+db.init( "mydatabase.db", myScheme )
+
+
+-- NOTE: In a real app you should do a one way encryption on the password field and never store it in clear text.
+-- It's always best to encrypt it, and compare it to the encryptied value in the database. 
+-- MD5 hash's are easy encrytption for passwwords, bt most hackers have already gotten MD5 password hashes for most
+-- common passwords anyway.
 
 --
 -- Load our fonts and define our styles
@@ -91,25 +96,22 @@ local iconInfo = {
 }
 
 myApp.icons = graphics.newImageSheet("images/ios7icons.png", iconInfo)
+myApp.font = "fonts/Roboto-Light.ttf"
+myApp.fontBold = "fonts/Roboto-Regular.ttf"
+myApp.fontItalic = "fonts/Roboto-LightItalic.ttf"
+myApp.fontBoldItalic = "fonts/Roboto-Italic.ttf"
+
+myApp.theme = "widget_theme_ios7"
 
 if system.getInfo("platformName") == "Android" then
-    myApp.theme = "widget_theme_android"
-    myApp.font = "Droid Sans"
-    myApp.fontBold = "Droid Sans Bold"
-    myApp.fontItalic = "Droid Sans"
-    myApp.fontBoldItalic = "Droid Sans Bold"
     myApp.topBarBg = "images/topBarBg7.png"
 
 else
-    myApp.theme = "widget_theme_ios7"
     local coronaBuild = system.getInfo("build")
     if tonumber(coronaBuild:sub(6,12)) < 1206 then
         myApp.theme = "widget_theme_ios"
     end
-    myApp.font = "HelveticaNeue-Light"
-    myApp.fontBold = "HelveticaNeue"
-    myApp.fontItalic = "HelveticaNeue-LightItalic"
-    myApp.fontBoldItalic = "Helvetica-BoldItalic"
+
 end
 widget.setTheme(myApp.theme)
 --
@@ -188,6 +190,16 @@ function myApp.showScreen5()
     return true
 end
 
+function myApp.showScreen6()
+    myApp.tabBar:setSelected(6)
+    local options = {
+
+        pageTitle = "Data Table"
+    }
+    composer.removeHidden()
+    composer.gotoScene("datatable", {time=250, effect="crossFade", params = options})
+    return true
+end
 --
 -- build the top bar which is a tab bar without buttons
 --
@@ -259,6 +271,18 @@ local tabButtons = {
         width = 32,
         height = 32,
         onPress = myApp.showScreen5,
+    },
+    {
+        label = "Data",
+        defaultFile = "images/tabbaricon.png",
+        overFile = "images/tabbaricon-down.png",
+        labelColor = { 
+            default = { 0.25, 0.25, 0.25 }, 
+            over = { 0.768, 0.516, 0.25 }
+        },
+        width = 32,
+        height = 32,
+        onPress = myApp.showScreen6,
     },
 }
 

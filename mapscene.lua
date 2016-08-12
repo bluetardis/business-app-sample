@@ -48,6 +48,9 @@ local locationtxt
 local mapWidth
 local mapHeight
 local navBar
+local addressGroup
+local addressLabel
+local addressField
 local views = {}
 
 local starbucksLocations = {}
@@ -116,32 +119,23 @@ local function setMode( event )
 	return true
 end
 
-local function textFieldHandler( event )
-    --
-    -- event.text only exists during the editing phase to show what's being edited.  
-    -- It is **NOT** the field's .text attribute.  That is event.target.text
-    --
-    if event.phase == "began" then
+local function textFieldHandler( textField )
+	return function( event )
+		if ( "began" == event.phase ) then
+			-- This is the "keyboard has appeared" event
+			-- In some cases you may want to adjust the interface when the keyboard appears.
 
-        -- user begins editing textField
-        print( "Begin editing", event.target.text )
-
-    elseif event.phase == "ended" or event.phase == "submitted" then
-
-        -- do something with defaulField's text
-        print( "Final Text: ", event.target.text)
-        navBar:setLabel( event.target.text )
-        myMap:requestLocation( event.target.text, mapLocationHandler )
-        native.setKeyboardFocus( nil )
-
-    elseif event.phase == "editing" then
-
-        print( event.newCharacters )
-        print( event.oldText )
-        print( event.startPosition )
-        print( event.text )
-
-    end
+		elseif ( "editing" == event.phase ) then
+		
+		elseif ( "submitted" == event.phase or "ended" == event.phase ) then
+			-- This event occurs when the user presses the "return" key (if available) on the onscreen keyboard
+	        print( "Final Text: ", event.target.text)
+	        navBar:setLabel( event.target.text )
+	        myMap:requestLocation( event.target.text, mapLocationHandler )
+			-- Hide keyboard
+			native.setKeyboardFocus( nil )
+		end
+	end
 end
 
 function scene:create( event )
@@ -160,10 +154,25 @@ function scene:create( event )
         title = params.pageTitle,
         backgroundColor = { 0.96, 0.62, 0.34 },
         titleColor = {1, 1, 1},
-        font = "HelveticaNeue"
+        font = myApp.fontBold
     })
     sceneGroup:insert(navBar)
 
+    addressGroup = display.newGroup()
+    sceneGroup:insert( addressGroup )
+    local addressBackground = display.newRect( 0, 0, display.contentWidth, 30 )
+    addressGroup:insert( addressBackground )
+    addressBackground:setFillColor( 1 )
+    addressBackground.anchorX = 0
+    addressBackground.anchorY = 0
+    addressLabel = display.newText( "Address", 10, 15, myApp.fontBold, 20)
+    addressLabel:setFillColor( 0 )
+    addressGroup:insert( addressLabel )
+    addressLabel.anchorX = 0
+    addressLabel.anchorY = 0.5
+
+    addressGroup.x = 0
+    addressGroup.y = navBar.y + 65
     --
     -- This serves two purposes.  First, its place holder so we can see where the mapView will be while
     -- working in the simulator.  Secondly, it lets us have something to calculate the positions of the
@@ -236,59 +245,48 @@ function scene:show( event )
 	if event.phase == "did" then
 		-- The text field's native peice starts hidden, we show it after we are on screen.on
 
-	    addressField = widget.newTextField({
-	        width = display.contentWidth,
-	        height = 30,
-	        cornerRadius = 6,
-	        strokeWidth = 0,
-	        text = "",
-	        fontSize = 14,
-	        placeholder = "Address",
-	        font = "HelveticaNeue-Light",
-	        labelFont = "HelveticaNeue",
-	        labelFontSize = 14,
-	        labelWidth = 60,
-	        listener = textFieldHandler,
-	        label = "Address"
-	    })
-	    -- Hide the native part of this until we need to show it on the screen.
+		local fieldWidth = display.contentWidth - 120
 
-	    addressField.x = display.contentCenterX
-	    addressField.y = navBar.height + 15
-	    sceneGroup:insert(addressField)
+		addressField = native.newTextField( 110, addressLabel.y, fieldWidth, 30 )
+		addressField:addEventListener( "userInput", textFieldHandler( function() return addressField end ) ) 
+		addressGroup:insert( addressField)
+		addressField.anchorX = 0
+		addressField.placeholder = "Address"
 
 		--
 		-- Because mapViews's are native objects, the cannot intermix with the OpenGL objects that composer is 
 		-- managing.  It's best to create it here and destory it in exitScene.  
 
 		myMap = native.newMapView( 0, 0, mapWidth , mapHeight ) 
-		myMap.mapType = "standard" -- other mapType options are "satellite" or "hybrid"
+		if myMap then
+			myMap.mapType = "standard" -- other mapType options are "satellite" or "hybrid"
 
-		-- The MapView is just another Corona display object, and can be moved or rotated, etc.
-		myMap.x = display.contentCenterX
-		myMap.y = mapHeight / 2 + navBar.height + 30
+			-- The MapView is just another Corona display object, and can be moved or rotated, etc.
+			myMap.x = display.contentCenterX
+			myMap.y = mapHeight / 2 + navBar.height + 30
 
-		--
-		-- Let's add some additional points of interest around our location
-		--
-		-- The event structure returned by requestLocation doesn't contain a reference to the data that
-		-- can be used to look up information to populate the marker's bubble or pass on to a more complex information
-		-- system (phone number, URL, etc.)
-		--
-		-- Let's use a Lua Closure (anonymous function) that will take the event table returned by the call and then
-		-- call our real function using the index of the table as an ID for the marker
-		--
+			--
+			-- Let's add some additional points of interest around our location
+			--
+			-- The event structure returned by requestLocation doesn't contain a reference to the data that
+			-- can be used to look up information to populate the marker's bubble or pass on to a more complex information
+			-- system (phone number, URL, etc.)
+			--
+			-- Let's use a Lua Closure (anonymous function) that will take the event table returned by the call and then
+			-- call our real function using the index of the table as an ID for the marker
+			--
 
-		for i = 1, #starbucksLocations do
-			myMap:requestLocation(starbucksLocations[i], function(event) addStarbucks(event, i); end)
+			for i = 1, #starbucksLocations do
+				myMap:requestLocation(starbucksLocations[i], function(event) addStarbucks(event, i); end)
+			end
+
+			myMap:requestLocation( "1900 Embarcadero Road, Palo Alto, CA", mapLocationHandler )
+			views[1]:addEventListener("touch", setMode)
+			views[2]:addEventListener("touch", setMode)
+			views[3]:addEventListener("touch", setMode)
+		else
+			native.showAlert( "Simulator", "Maps are only avaiable on device.", { "Okay" } )
 		end
-
-		myMap:requestLocation( "1900 Embarcadero Road, Palo Alto, CA", mapLocationHandler )
-
-
-		views[1]:addEventListener("touch", setMode)
-		views[2]:addEventListener("touch", setMode)
-		views[3]:addEventListener("touch", setMode)
 	end
 end
 
